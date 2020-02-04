@@ -74,6 +74,60 @@ class RPi_PWM_Adapter(object):
             raise ValueError('Pin {0} is not configured as a PWM.  Make sure to first call start for the pin.'.format(pin))
         self.pwm[pin].stop()
         del self.pwm[pin]
+ 
+ class OPi_PWM_Adapter(object):
+    """PWM implementation for the Orange Pi using the OPi.GPIO PWM library."""
+
+    def __init__(self, opi_gpio, mode=None):
+        self.opi_gpio = opi_gpio
+        # Suppress warnings about GPIO in use.
+        opi_gpio.setwarnings(False)
+        # Set board or BCM pin numbering.
+        if mode == opi_gpio.BOARD or mode == opi_gpio.BCM:
+            opi_gpio.setmode(mode)
+        elif mode is not None:
+            raise ValueError('Unexpected value for mode.  Must be BOARD or BCM.')
+        else:
+            # Default to BCM numbering if not told otherwise.
+            opi_gpio.setmode(opi_gpio.BCM)
+        # Store reference to each created PWM instance.
+        self.pwm = {}
+
+    def start(self, pin, dutycycle, frequency_hz=2000):
+        """Enable PWM output on specified pin.  Set to intiial percent duty cycle
+        value (0.0 to 100.0) and frequency (in Hz).
+        """
+        if dutycycle < 0.0 or dutycycle > 100.0:
+            raise ValueError('Invalid duty cycle value, must be between 0.0 to 100.0 (inclusive).')
+        # Make pin an output.
+        self.opi_gpio.setup(pin, self.opi_gpio.OUT)
+        # Create PWM instance and save a reference for later access.
+        self.pwm[pin] = self.opi_gpio.PWM(pin, frequency_hz)
+        # Start the PWM at the specified duty cycle.
+        self.pwm[pin].start(dutycycle)
+
+    def set_duty_cycle(self, pin, dutycycle):
+        """Set percent duty cycle of PWM output on specified pin.  Duty cycle must
+        be a value 0.0 to 100.0 (inclusive).
+        """
+        if dutycycle < 0.0 or dutycycle > 100.0:
+            raise ValueError('Invalid duty cycle value, must be between 0.0 to 100.0 (inclusive).')
+        if pin not in self.pwm:
+            raise ValueError('Pin {0} is not configured as a PWM.  Make sure to first call start for the pin.'.format(pin))
+        self.pwm[pin].ChangeDutyCycle(dutycycle)
+
+    def set_frequency(self, pin, frequency_hz):
+        """Set frequency (in Hz) of PWM output on specified pin."""
+        if pin not in self.pwm:
+            raise ValueError('Pin {0} is not configured as a PWM.  Make sure to first call start for the pin.'.format(pin))
+        self.pwm[pin].ChangeFrequency(frequency_hz)
+
+    def stop(self, pin):
+        """Stop PWM output on specified pin."""
+        if pin not in self.pwm:
+            raise ValueError('Pin {0} is not configured as a PWM.  Make sure to first call start for the pin.'.format(pin))
+        self.pwm[pin].stop()
+        del self.pwm[pin]
 
 
 class BBIO_PWM_Adapter(object):
@@ -111,7 +165,7 @@ class BBIO_PWM_Adapter(object):
 
 def get_platform_pwm(**keywords):
     """Attempt to return a PWM instance for the platform which the code is being
-    executed on.  Currently supports only the Raspberry Pi using the RPi.GPIO
+    executed on.  Currently supports only the Orange Pi and the Raspberry Pi using the RPi.GPIO
     library and Beaglebone Black using the Adafruit_BBIO library.  Will throw an
     exception if a PWM instance can't be created for the current platform.  The
     returned PWM object has the same interface as the RPi_PWM_Adapter and
@@ -121,6 +175,9 @@ def get_platform_pwm(**keywords):
     if plat == Platform.RASPBERRY_PI:
         import RPi.GPIO
         return RPi_PWM_Adapter(RPi.GPIO, **keywords)
+    elif plat == Platform.ORANGE_PI:
+        import OPi.GPIO
+        return OPi_PWM_Adapter(OPi.GPIO, **keywords)
     elif plat == Platform.BEAGLEBONE_BLACK:
         import Adafruit_BBIO.PWM
         return BBIO_PWM_Adapter(Adafruit_BBIO.PWM, **keywords)
