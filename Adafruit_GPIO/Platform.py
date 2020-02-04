@@ -26,15 +26,21 @@ UNKNOWN          = 0
 RASPBERRY_PI     = 1
 BEAGLEBONE_BLACK = 2
 MINNOWBOARD      = 3
-JETSON_NANO       = 4
+JETSON_NANO      = 4
+ORANGE_PI        = 5
 
 def platform_detect():
-    """Detect if running on the Raspberry Pi or Beaglebone Black and return the
-    platform type.  Will return RASPBERRY_PI, BEAGLEBONE_BLACK, or UNKNOWN."""
+    """Detect if running on the Orange Pi, Raspberry Pi or Beaglebone Black and return the
+    platform type.  Will return ORANGE_PI, RASPBERRY_PI, BEAGLEBONE_BLACK, or UNKNOWN."""
     # Handle Raspberry Pi
     pi = pi_version()
     if pi is not None:
         return RASPBERRY_PI
+
+    # Handle Orange Pi
+    opi = orangepi_version()
+    if opi is not None:
+        return ORANGE_PI
 
     # Handle Beaglebone Black
     # TODO: Check the Beaglebone Black /proc/cpuinfo value instead of reading
@@ -110,4 +116,29 @@ def pi_version():
         return 3
     else:
         # Something else, not a pi.
+        return None
+
+def orangepi_version():
+    """Detect the version of the Orange Pi.  Returns either 1, 2
+    """
+    # Check /etc/armbian-release for the Hardware field value.
+    # orangepilite is orangepi 1
+    # orangepipc is orangepi 2
+    # Anything else is not a orangepi.
+    with open('/etc/armbian-release', 'r') as infile:
+        board = infile.read()
+    # Match a line like 'BOARD=orangepilite'
+    match = re.search('^BOARD=(\w+)$', board,
+                      flags=re.MULTILINE | re.IGNORECASE)
+    if not match:
+        # Couldn't find the hardware, assume it isn't a orangepi.
+        return None
+    if match.group(1) == 'orangepilite':
+        # Orangepi Lite
+        return 1
+    elif match.group(1) == 'orangepipc':
+        # Orangepi PC
+        return 2
+    else:
+        # Something else, not a orangepi.
         return None
